@@ -1,5 +1,6 @@
 package com.example.firebase;
 
+import android.content.Intent;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -13,12 +14,14 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 
 public class MainActivity extends AppCompatActivity {
 
     private EditText textEmail;
     private EditText textPassword;
     private Button buttonRegister;
+    private Button buttonLogin;
 
     private FirebaseAuth firebaseAuth;
     @Override
@@ -35,12 +38,20 @@ public class MainActivity extends AppCompatActivity {
                 registerUser();
             }
         });
+
+        buttonLogin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loginUser();
+            }
+        });
     }
 
     private void initUI(){
         textEmail = findViewById(R.id.text_email);
         textPassword = findViewById(R.id.text_password);
         buttonRegister = findViewById(R.id.register_button);
+        buttonLogin = findViewById(R.id.login_button);
     }
 
     private void registerUser(){
@@ -55,7 +66,11 @@ public class MainActivity extends AppCompatActivity {
                         Toast.makeText(getApplicationContext(),"Registro realizado correctamente",Toast.LENGTH_SHORT).show();
                         clean();
                     }else{
-                        Toast.makeText(getApplicationContext(),"Registro fallido",Toast.LENGTH_SHORT).show();
+                        if (task.getException() instanceof FirebaseAuthUserCollisionException){
+                            Toast.makeText(getApplicationContext(),"El usuario ya está registrado",Toast.LENGTH_SHORT).show();
+                        }else{
+                            Toast.makeText(getApplicationContext(),"Registro fallido",Toast.LENGTH_SHORT).show();
+                        }
                     }
                 }
             });
@@ -74,5 +89,25 @@ public class MainActivity extends AppCompatActivity {
     private void clean(){
         textEmail.setText("");
         textPassword.setText("");
+    }
+
+    private void loginUser(){
+        String email = textEmail.getText().toString().trim();
+        String password = textPassword.getText().toString().trim();
+
+        if (validation(email,password)){
+            firebaseAuth.signInWithEmailAndPassword(email,password).addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                @Override
+                public void onComplete(@NonNull Task<AuthResult> task) {
+                    if (task.isSuccessful()){
+                        Intent intent = new Intent(MainActivity.this,WellcomeActivity.class);
+                        intent.putExtra("Email",textEmail.getText().toString().trim());
+                        startActivity(intent);
+                    }else{
+                        Toast.makeText(getApplicationContext(),"Inicio de sesión fallido",Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
     }
 }
