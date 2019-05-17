@@ -5,6 +5,7 @@ import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -15,6 +16,10 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthUserCollisionException;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -24,6 +29,7 @@ public class MainActivity extends AppCompatActivity {
     private Button buttonLogin;
 
     private FirebaseAuth firebaseAuth;
+    private FirebaseFirestore firebaseFirestore;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -31,11 +37,12 @@ public class MainActivity extends AppCompatActivity {
 
         initUI();
         firebaseAuth = FirebaseAuth.getInstance();
+        firebaseFirestore = FirebaseFirestore.getInstance();
 
         buttonRegister.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                registerUser();
+                checkUser();
             }
         });
 
@@ -54,22 +61,20 @@ public class MainActivity extends AppCompatActivity {
         buttonLogin = findViewById(R.id.login_button);
     }
 
-    private void registerUser(){
-        String email = textEmail.getText().toString().trim();
-        String password = textPassword.getText().toString().trim();
+    private void checkUser(){
+        final String email = textEmail.getText().toString().trim();
+        final String password = textPassword.getText().toString().trim();
 
-        if (validation(email,password)){
-            firebaseAuth.createUserWithEmailAndPassword(email,password).addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+        if (validation(email, password)) {
+            firebaseFirestore.collection("users").whereEqualTo("email", email).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                 @Override
-                public void onComplete(@NonNull Task<AuthResult> task) {
-                    if (task.isSuccessful()){
-                        Toast.makeText(getApplicationContext(),"Registro realizado correctamente",Toast.LENGTH_SHORT).show();
-                        clean();
-                    }else{
-                        if (task.getException() instanceof FirebaseAuthUserCollisionException){
-                            Toast.makeText(getApplicationContext(),"El usuario ya está registrado",Toast.LENGTH_SHORT).show();
-                        }else{
-                            Toast.makeText(getApplicationContext(),"Registro fallido",Toast.LENGTH_SHORT).show();
+                public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                    if (task.isSuccessful()) {
+                        int existUser = task.getResult().getDocuments().size();
+                        if (existUser > 0) {
+                            register(email, password);
+                        } else {
+                            Toast.makeText(MainActivity.this, "¡No puedes registrate!", Toast.LENGTH_SHORT).show();
                         }
                     }
                 }
@@ -109,5 +114,29 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         }
+    }
+
+    private void register(String email, String password){
+        firebaseAuth.createUserWithEmailAndPassword(email,password).addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+            @Override
+            public void onComplete(@NonNull Task<AuthResult> task) {
+                if (task.isSuccessful()){
+                    Toast.makeText(getApplicationContext(),"Registro realizado correctamente",Toast.LENGTH_SHORT).show();
+                    clean();
+
+                    FirebaseUser user = task.getResult().getUser();
+                    if (!user.isEmailVerified()){
+                        user.sendEmailVerification();
+                    }
+
+                }else{
+                    if (task.getException() instanceof FirebaseAuthUserCollisionException){
+                        Toast.makeText(getApplicationContext(),"El usuario ya está registrado",Toast.LENGTH_SHORT).show();
+                    }else{
+                        Toast.makeText(getApplicationContext(),"Registro fallido",Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        });
     }
 }
